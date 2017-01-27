@@ -11,14 +11,13 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/lxn/win"
-	graphite "github.com/marpaia/graphite-golang"
 )
 
 func main() {
 
 	counterName := `\.NET CLR Memory(*)\# Gen 0 Collections`
 
-	c, err := ReadPerformanceCounter(counterName, 10)
+	c, err := readPerformanceCounter(counterName, 10)
 
 	if err != nil {
 		log.Printf("unable to read perf counter \n")
@@ -29,7 +28,7 @@ func main() {
 	}
 }
 
-func ReadPerformanceCounter(counter string, sleepInterval int) (chan []graphite.Metric, error) {
+func readPerformanceCounter(counter string, sleepInterval int) (chan []Metric, error) {
 
 	var queryHandle win.PDH_HQUERY
 	var counterHandle win.PDH_HCOUNTER
@@ -55,18 +54,18 @@ func ReadPerformanceCounter(counter string, sleepInterval int) (chan []graphite.
 		return nil, errors.New(fmt.Sprintf("Got an error: 0x%x\n", ret))
 	}
 
-	out := make(chan []graphite.Metric)
+	out := make(chan []Metric)
 
 	go func() {
 		for {
 			ret = win.PdhCollectQueryData(queryHandle)
 			if ret == win.ERROR_SUCCESS {
 
-				var metric []graphite.Metric
+				var metric []Metric
 
 				var bufSize uint32
 				var bufCount uint32
-				var size uint32 = uint32(unsafe.Sizeof(win.PDH_FMT_COUNTERVALUE_ITEM_DOUBLE{}))
+				var size = uint32(unsafe.Sizeof(win.PDH_FMT_COUNTERVALUE_ITEM_DOUBLE{}))
 				var emptyBuf [1]win.PDH_FMT_COUNTERVALUE_ITEM_DOUBLE // need at least 1 addressable null ptr.
 
 				ret = win.PdhGetFormattedCounterArrayDouble(counterHandle, &bufSize, &bufCount, &emptyBuf[0])
@@ -83,7 +82,7 @@ func ReadPerformanceCounter(counter string, sleepInterval int) (chan []graphite.
 								metricName = fmt.Sprintf("%s.%s", normalizePerfCounterMetricName(counter), normalizePerfCounterMetricName(s))
 							}
 
-							metric = append(metric, graphite.Metric{
+							metric = append(metric, Metric{
 								metricName,
 								fmt.Sprintf("%v", c.FmtValue.DoubleValue),
 								time.Now().Unix()})
@@ -114,11 +113,11 @@ func normalizePerfCounterMetricName(rawName string) (normalizedName string) {
 	)
 	normalizedName = r.Replace(normalizedName)
 
-	normalizedName = NormalizeMetricName(normalizedName)
+	normalizedName = normalizeMetricName(normalizedName)
 	return
 }
 
-func NormalizeMetricName(rawName string) (normalizedName string) {
+func normalizeMetricName(rawName string) (normalizedName string) {
 
 	normalizedName = strings.ToLower(rawName)
 
